@@ -1,0 +1,86 @@
+#made to write data in sql friendly database for later use in sqlite 
+import json
+import sqlite3 #import for sql
+from pathlib import Path
+
+cleaned_file = Path("data/cleaned/traffic_events_cleaned.json")
+database_file = Path("data/traffic.db") #paths to cleaned data and create file where the data will be stored  traffic.db
+
+with open(cleaned_file, "r", encoding="utf-8") as file: #read files and save it to events 
+    events = json.load(file)
+
+connection = sqlite3.connect(database_file) #creates the database file (if not created already) to connect sqlite to traffic.db
+cursor = connection.cursor() #allows for SQL commands to write to db
+
+
+#runs this Sql command which is reading all the different event specifiers and clarifying them to what they mean, this saves this command as the structure of what db will look like and also make sure the table will run even if it exists already
+cursor.execute(""" 
+CREATE TABLE IF NOT EXISTS traffic_events (
+    id TEXT PRIMARY KEY,
+    road TEXT,
+    description TEXT,
+    event_type TEXT,
+    event_subtype TEXT,
+    direction TEXT,
+    reported INTEGER,
+    last_updated INTEGER,
+    start_date TEXT,
+    planned_end_date TEXT,
+    lanes_affected TEXT,
+    latitude REAL,
+    longitude REAL,
+    is_full_closure INTEGER,
+    severity TEXT
+)
+""")
+
+
+#runs loop against all events
+for event in events:
+    cursor.execute("""
+    INSERT OR REPLACE INTO traffic_events (
+        id,
+        road,
+        description,
+        event_type,
+        event_subtype,
+        direction,
+        reported,
+        last_updated,
+        start_date,
+        planned_end_date,
+        lanes_affected,
+        latitude,
+        longitude,
+        is_full_closure,
+        severity
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        event["id"],
+        event["road"],
+        event["description"],
+        event["event_type"],
+        event["event_subtype"],
+        event["direction"],
+        event["reported"],
+        event["last_updated"],
+        event["start_date"],
+        event["planned_end_date"],
+        event["lanes_affected"],
+        event["latitude"],
+        event["longitude"],
+        event["is_full_closure"],
+        event["severity"]
+    ))
+#values are specifed with placeholder ? and run for all events
+
+connection.commit() 
+
+cursor.execute("SELECT COUNT(*) FROM traffic_events")
+count = cursor.fetchone()[0]#counts number of events saved to database 
+
+connection.close() 
+
+print(f"Loaded {count} traffic events into SQLite.")
+print(f"Database saved to: {database_file}")
